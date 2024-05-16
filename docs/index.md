@@ -5,6 +5,7 @@ sql:
   dyn_sync: ./data/dyn_sync_networks_clean.parquet
 ---
 
+
 <style>
 
 .hero {
@@ -52,7 +53,7 @@ sql:
 See [docs](https://help.openalex.org/how-it-works/topics)
 
 ```js
-const topN = view(Inputs.range([30, 100], { label: "top N papers by citations" }))
+const topN = view(Inputs.range([30, 100], { step: 1, label: "top N papers by citations", value: 30 }))
 ```
 
 ---
@@ -71,7 +72,9 @@ const year = view(Inputs.range([rangeYr[0].min_yr,rangeYr[0].max_yr], { step:1, 
 ```
 
 ```sql id=stat_mech
-SELECT DISTINCT title, authorships, cited_by_count, publication_year FROM stat_mech WHERE publication_year = ${year}
+SELECT 
+DISTINCT title, cited_by_count, publication_year, source, target, authorships
+FROM stat_mech WHERE publication_year = ${year}
 ```
 
 <div>${
@@ -86,6 +89,7 @@ SELECT DISTINCT title, authorships, cited_by_count, publication_year FROM stat_m
 ```js
 const selected_papers=view(Inputs.search(stat_mech, {label: "search table"}))
 ```
+
 
 ---
 
@@ -104,10 +108,10 @@ const year2 = view(Inputs.range([rangeYr2[0].min_yr,rangeYr2[0].max_yr], { step:
 ```
 
 ```sql id=dyn_sync
-SELECT * FROM dyn_sync WHERE publication_year = ${year2}
+SELECT DISTINCT title, cited_by_count, publication_year, field,authorships FROM dyn_sync WHERE publication_year = ${year2}
 ```
 
-  <div class="grid-colspan-3">${
+<div class="grid-colspan-3">${
     resize((width) => plot_top_n(dyn_sync, {width}))
   }</div>
 <div class="card" style="padding:0">
