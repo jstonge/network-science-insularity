@@ -47,62 +47,110 @@ sql:
 
 </style>
 
+# Exploring complex networks related topics in OpenAlex
+
+See [docs](https://help.openalex.org/how-it-works/topics)
+
+```js
+const topN = view(Inputs.range([30, 100], { label: "top N papers by citations" }))
+```
+
+---
+
 ## 10K papers from statistical mechanics of complex networks
 
-[openAlex](https://openalex.org/works?page=1&filter=primary_topic.id%3At10064)
 
+- [openAlex query](https://openalex.org/works?page=1&filter=primary_topic.id%3At10064)
+
+```sql id=[...rangeYr]
+SELECT MIN(publication_year) as min_yr, MAX(publication_year) as max_yr FROM stat_mech
+```
+
+```js
+const year = view(Inputs.range([rangeYr[0].min_yr,rangeYr[0].max_yr], { step:1, value: 2000 }) )
+```
 
 ```sql id=stat_mech
-SELECT DISTINCT title, authorships, cited_by_count FROM stat_mech
+SELECT DISTINCT title, authorships, cited_by_count, publication_year FROM stat_mech WHERE publication_year = ${year}
 ```
 
-```js
-const selected_papers=view(Inputs.search(stat_mech))
-```
-```js
-Inputs.table(selected_papers)
-```
+<div>${
+    resize((width) => plot_top_n(stat_mech, {width}))
+  }</div>
+<div class="card" style="padding:0">
+  ${
+    Inputs.table(selected_papers)
+  }
+</div>
 
 ```js
-[...stat_mech].map(d=>JSON.parse(d.authorships).map(d=>d.author.display_name).join("; "))
+const selected_papers=view(Inputs.search(stat_mech, {label: "search table"}))
 ```
 
-```js
-Plot.plot({
-  marginLeft: 500,
-  marginRight: 400,
-  width: 1200,
-  x: {grid: true},
-  marks: [
-    Plot.barX(stat_mech, {
-      x: "cited_by_count",
-      y: "title",
-      sort: { y: "x", reverse: true, limit: 40 }
-    }),
-    Plot.text(stat_mech, {
-      text: d => `${JSON.parse(d.authorships).map(d=>d.author.display_name).join("; ")}`,
-      x: "cited_by_count",
-      y: "title",
-      textAnchor: "start",
-      dx: 3,
-      fill: "black"
-    })
-  ]
-})
-```
+---
+
 
 
 ## 10K papers from Dynamical synchronization of complex networks
 
 [openAlex](https://openalex.org/works?page=1&filter=primary_topic.id%3At10064)
 
-```sql
-SELECT * FROM dyn_sync
+```sql id=[...rangeYr2]
+SELECT MIN(publication_year) as min_yr, MAX(publication_year) as max_yr FROM dyn_sync
 ```
 
+```js
+const year2 = view(Inputs.range([rangeYr2[0].min_yr,rangeYr2[0].max_yr], { step:1, value: 2000 }) )
+```
 
-## table description
+```sql id=dyn_sync
+SELECT * FROM dyn_sync WHERE publication_year = ${year2}
+```
+
+  <div class="grid-colspan-3">${
+    resize((width) => plot_top_n(dyn_sync, {width}))
+  }</div>
+<div class="card" style="padding:0">
+  ${
+    Inputs.table(selected_papers2)
+  }
+</div>
+
+```js
+const selected_papers2 = view(Inputs.search(dyn_sync))
+```
+
+---
+
+## SQL table description
 
 ```sql
 DESCRIBE TABLE stat_mech
+```
+
+
+```js
+function plot_top_n(data, {width} = {}) {
+  return Plot.plot({
+    marginLeft: 650,
+    marginRight: 300,
+    width,
+    x: {grid: true},
+    marks: [
+      Plot.barX(data, {
+        x: "cited_by_count",
+        y: "title",
+        sort: { y: "x", reverse: true, limit: topN }
+      }),
+      Plot.text(data, {
+        text: d => `${JSON.parse(d.authorships).map(d=>d.author.display_name).join("; ")}`,
+        x: "cited_by_count",
+        y: "title",
+        textAnchor: "start",
+        dx: 3,
+        fill: "black"
+      })
+    ]
+  })
+}
 ```
