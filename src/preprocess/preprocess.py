@@ -2,6 +2,11 @@ import pandas as pd
 from collections import Counter
 from itertools import combinations
 import numpy as np
+from pathlib import Path
+
+# Numbers don't match with the ones in the API...
+# dfs = pd.concat([pd.read_parquet(file) for file in Path().glob("*parquet")], axis=0)
+# dfs.to_parquet("../../data/primary_stat_mech_networks.parquet")
 
 def extract_subfield(x): 
     # we take the set of each field by paper
@@ -13,7 +18,7 @@ def extract_field(x):
 
 cols2keep = ['id', 'doi', 'title', 'publication_year', 'topics', 'display_name', 'authorships', 'cited_by_count', 'keywords', 'grants']
 
-df = pd.read_parquet("../stat_mech_networks.parquet")
+df = pd.read_parquet("../../data/primary_stat_mech_networks.parquet")
 
 subfield2field = {}
 for topics in df.topics:
@@ -38,16 +43,18 @@ tidy_df.drop(columns=['subfield_edge'], inplace=True)
 
 tidy_df[['source', 'target']] = pd.DataFrame(np.sort(tidy_df[['source', 'target']], axis=1))
 
+# add mapping from source/target subfield -> field
 tidy_df['source_field'] = tidy_df['source'].map(lambda x: subfield2field[x])
 tidy_df['target_field'] = tidy_df['target'].map(lambda x: subfield2field[x])
 
+# 
 # aggregated_df = df.groupby(['source', 'target'], as_index=False)['value'].sum()
 
 tidy_df.to_parquet("../../docs/data/stat_mech_networks_clean.parquet")
 
+# dynamical synchronization topic
+# df=pd.read_parquet("../dyn_sync_networks.parquet")
+# df['subfield'] = df.topics.map(lambda x: extract_field(x))
+# df=df[~df.title.duplicated()][cols2keep]
 
-df=pd.read_parquet("../dyn_sync_networks.parquet")
-df['subfield'] = df.topics.map(lambda x: extract_field(x))
-df=df[~df.title.duplicated()][cols2keep]
-
-df.to_parquet("../../docs/data/dyn_sync_networks_clean.parquet")
+# df.to_parquet("../../docs/data/dyn_sync_networks_clean.parquet")

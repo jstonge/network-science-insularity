@@ -2,7 +2,6 @@
 toc: false
 sql: 
   stat_mech: ./data/stat_mech_networks_clean.parquet
-  dyn_sync: ./data/dyn_sync_networks_clean.parquet
 ---
 
 <style>
@@ -47,21 +46,8 @@ sql:
 
 </style>
 
-# Exploring complex networks related topics in OpenAlex
-
 ```js
 import * as d3 from "npm:d3";
-```
-
-```js
-const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
-```
-
-```sql id=[...links]
-SELECT COUNT(*) as value, source, target 
-FROM stat_mech 
-WHERE publication_year = ${sel_yr} AND source != target 
-GROUP BY source, target
 ```
 
 ```sql id=[...nodes]
@@ -76,7 +62,14 @@ FROM stat_mech
 WHERE publication_year = ${sel_yr};
 ```
 
+```sql id=[...links]
+SELECT COUNT(*) as value, source, target 
+FROM stat_mech 
+WHERE publication_year = ${sel_yr} AND source != target 
+GROUP BY source, target
+```
 
+# Exploring complex networks related topics in OpenAlex
 
 ```js
 function arc(nodes, edges, {width} = {}) {
@@ -84,8 +77,8 @@ const step = 14;
 const marginTop = 20;
 const marginRight = 400;
 const marginBottom = 20;
-const marginLeft = 230;
-const height = 600;
+const marginLeft = 250;
+const height = (nodes.length - 1) * step + marginTop + marginBottom;
 const y = d3.scalePoint(orders.get("by group"), [marginTop, height - marginBottom]);
 
 // A color scale for the nodes and links.
@@ -205,9 +198,56 @@ function update(order) {
 
 ```
 
+We have the following question
+
+> Is network science became more _insular_ overtime? That is, is the physics of complex networks community was more outward looking at its inception than in recent years.
+
+Here is an idea to answer that question. Insularity here means something very close to network modularity. A community is modular when there is more edges within communities than across communities.  
+
+<img src="https://d3i71xaburhd42.cloudfront.net/2a91c8ff11a828209f10714cfc46fd929a51e9dc/1-Figure1-1.png" width=200></img> 
+
+Modularity maximization is an approach to community detection which propose cutting points to find the partition that maximize modularity. In the figure above, modularity is maximize by cutting through the five bridges that separate those 3 communities. 
+
+OpenAlex--an open database for scientific works--provide topics to classify scientific works, e.g. Knowledge Management and Organizational Innovation, Coronavirus Disease 2019, Swarm Intelligence Optimization Algorithms. It is the most fine-grained labels that they have to classify works. Each paper have multiple normalized scores for multiple topics, and openAlex defined the primary topic of a paper as the topic with the greatest score. Each topic is mapped onto a single subfield, which in turn belong to a single field (see [here](https://jstonge.observablehq.cloud/hello-research-groups/overthinking-fos#openalex-taxonomy) for the classification tree). There are 4516 topics, for 252 subfields, and 26 fields.
+
+Where do topics come from? They are clusters identified by maximizing modularity on the citation graph! OpenAlex researchers claim that this approach based on citation networks actually output research communities focused on different topics; they assume that researchers citing each other in a community will maximize modularity, and that this corresponds to topics. Once they have the communites, they ask GPT3.5 Turbo (🥲) to label them using titles (and abstract) from a representative samples of papers. Similarly, once they have the labeled communities (topics), they map those communities to known fields and subfields from SCOPUS, a well known bibliometric database. Although each paper has multiple topics, we will work with their primary topic. 
+
+Now, how does topics relate to the insularity of a field? One way to measure if a community is insular would be to look at how their _papers_ are outward looking. More precisely, our proposal to measure insularity is to look at the _number of works cited by a given paper within the same topic over papers with different topics_. A ratio of one means that a paper, which we assume belong to a given community, is engaging with as many papers within that community than with other communities. 
+
+Lets look at an example to help us understand the proposal. Linton Freeman article on "Centrality in social networks conceptual clarification" is characterized by the topic of _Statistical Mechanics of Complex Networks_.  This work from 1978 was cited 13 347. In return, it has cited 28 other papers, with the following counts with respect to other subfields:
+
+```
+{
+  'Economics and Econometrics': 1,
+  'Geometry and Topology': 2,
+  'Statistical and Nonlinear Physics': 8,
+  'Computational Theory and Mathematics': 2,
+  'Social Psychology': 3,
+  'Strategy and Management': 1,
+  'Molecular Biology': 1,
+  'Communication': 1,
+  'Control and Systems Engineering': 1,
+  'Management, Monitoring, Policy and Law': 1,
+  'Sociology and Political Science': 1,
+  'Transportation': 1,
+  'Geography, Planning and Development': 1,
+  'Computer Networks and Communications': 1,
+  'Clinical Psychology': 2,
+  'General Economics, Econometrics and Finance': 1
+}
+```
+
+where 8 papers out of 28 are directed inward (note that we could've done the same exercice at the topic level. We will run both in parallel and see how this might affect the results). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is it alot? Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
+
+## Scaling up
+
+```js
+const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
+```
+
 <div class="grid grid-cols-2">
   <div>
-    On the right, we have the subfields co-occurences within paper that have as primary topic <em>Statistical mechanics of complex networks</em>. The topic is a clustering of the citation network for works that have incoming and outgoing citations. Then, openAlex team linked the topics with subfield and fields from Scopus using Gpt-3.5 Turbo.
+    In the arc diagram figure, we have the subfields co-occurences within paper that have as primary topic <em>Statistical mechanics of complex networks</em>. The topic is a clustering of the citation network for works that have incoming and outgoing citations. Then, openAlex team linked the topics with subfield and fields from Scopus using Gpt-3.5 Turbo.
   </div>
   <div>${
     resize((width) => arc(nodes, links, {width}))
@@ -242,3 +282,20 @@ const selected_links = view(Inputs.search(links))
   Inputs.table(selected_links)
 }
 </div>
+
+```sql id=[...nodesRaw]
+SELECT DISTINCT title, cited_by_count, subfield
+FROM stat_mech
+WHERE publication_year = ${sel_yr}
+```
+
+```js
+nodesRaw
+```
+
+```sql id=[...selflinks]
+SELECT COUNT(*) as value, source, target 
+FROM stat_mech 
+WHERE publication_year = ${sel_yr} AND source = target 
+GROUP BY source, target
+```

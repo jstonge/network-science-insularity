@@ -5,3 +5,8 @@ node_modules/
 yarn-error.log
 .venv/
 src/*parquet
+
+data/by_year/*
+data/*parquet
+
+data/dyn_sync_networks.parquet
