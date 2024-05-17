@@ -218,6 +218,31 @@ Lets look at an example to help us understand the proposal. Linton Freeman artic
 
 ```
 {
+  'Economic Policy and Development Analysis': 1,
+  'Graph Spectra and Topological Indices': 2,
+  'Statistical Physics of Opinion Dynamics': 6,
+  'Graph Theory and Algorithms': 2,
+  'Temporal Dynamics of Team Processes and Performance': 3,
+  'Coopetition in Business Networks and Innovation': 1,
+  'Stochasticity in Gene Regulatory Networks': 1,
+  'The Impact of Digital Media on Public Discourse': 1,
+  'Integration of Cyber, Physical, and Social Systems': 1,
+  'Assessment of Sustainable Development Indicators and Strategies': 1,
+  'Intergroup Relations and Social Identity Theories': 1,
+  'Statistical Mechanics of Complex Networks': 2,
+  'Understanding Attitudes Towards Public Transport and Private Car': 1,
+  'Volunteered Geographic Information and Geospatial Crowdsourcing': 1,
+  'Distributed Constraint Optimization Problems and Algorithms': 1,
+  'Therapeutic Alliance in Psychotherapy': 1,
+  'Impact of Technological Revolutions on Global Economy': 1,
+  'Psychodynamic Psychotherapy and Developmental Trauma': 1
+ }
+```
+
+where 2 papers out of 28 are directed inward, meaning that they cite other papers within the same research communities. If we find topics to be too nitty-gritty, we can do the same exercice at the level of subfields:
+
+```
+{
   'Economics and Econometrics': 1,
   'Geometry and Topology': 2,
   'Statistical and Nonlinear Physics': 8,
@@ -237,9 +262,12 @@ Lets look at an example to help us understand the proposal. Linton Freeman artic
 }
 ```
 
-where 8 papers out of 28 are directed inward (note that we could've done the same exercice at the topic level. We will run both in parallel and see how this might affect the results). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is it alot? Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
+In this case, 8 papers out of 28 are directed inward at the subfield level (Statistical Mechanics of Complex Networks has Statistical and Nonlinear Physics as subfield). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is both of the numbers above alot?  Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
 
 ## Scaling up
+
+
+## Looking at topic co-occurences for the beauty of it
 
 ```js
 const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
@@ -247,7 +275,7 @@ const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
 
 <div class="grid grid-cols-2">
   <div>
-    In the arc diagram figure, we have the subfields co-occurences within paper that have as primary topic <em>Statistical mechanics of complex networks</em>. The topic is a clustering of the citation network for works that have incoming and outgoing citations. Then, openAlex team linked the topics with subfield and fields from Scopus using Gpt-3.5 Turbo.
+    The arc diagram displays subfields co-occurences within paper with <em>Statistical mechanics of complex networks</em> as primary topic. Nodes are colored according to their field of research. This is a very neat way to know which subfields tend to show up together. 
   </div>
   <div>${
     resize((width) => arc(nodes, links, {width}))
@@ -275,7 +303,7 @@ const degree = d3.rollup(
 ```
 
 ```js
-const selected_links = view(Inputs.search(links))
+const selected_links = view(Inputs.search(nodes))
 ```
 
 <div class="card", style="padding:0">${
