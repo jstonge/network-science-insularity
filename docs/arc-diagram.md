@@ -301,6 +301,8 @@ Plot.plot({
 })
 ```
 
+We observe that there is a 38% (going from 95% in 1997 to 57% in 2009) drop in references going outside the `Statistical and Nonlinear Physics` research community. Is this alot? Is this an artefact of our method? Perhaps it has to do with how Leiden's clustering algorithm works with respect to evolving communities? 
+
 ```sql id=ts_data_prop display
 SELECT
     year,
@@ -313,6 +315,20 @@ FROM
 GROUP BY
     year, type;
 ```
+
+## Overthinking Leiden
+
+- [openAlex: End-to-End Process for Topic Classification](https://docs.google.com/document/d/1bDopkhuGieQ4F8gGNj7sEc8WSE8mvLZS/edit?usp=sharing&ouid=106329373929967149989&rtpof=true&sd=true)
+- [An open approach for classifying research publications](https://www.leidenmadtrics.nl/articles/an-open-approach-for-classifying-research-publications)
+- [From Louvain to Leiden: guaranteeing well-connected communities](https://www.nature.com/articles/s41598-019-41695-z)
+- [CWTSLeiden/publicationclassification](https://github.com/CWTSLeiden/publicationclassification)
+- [openAlex_topic_mapping_table](https://docs.google.com/spreadsheets/d/1v-MAq64x4YjhO7RWcB-yrKV5D_2vOOsxl4u6GBKEXY8/edit?usp=sharing)
+
+Leiden is a community-detection method that use modularity maximization to create communities. The network in question is 71 million nodes (journal articles, proceeding papers, preprting, and book chapters) and 1715 million edges (citation links), spanning from 2000 to 2023. The researchers who ran the clustering ended up with 4521 topics, or research areas, at the micro-level. 
+
+It is good to know that the topics seen on the openAlex API is the results of a two step process. The first step included all the papers that had incoming or outgoing citation data, which is a third of the data available in openAlex. As a second step, OpenAlex folks extended the labeling by first embedding combinations of journal title, abstract (when available), and journal names using [setence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), then use that as feature to do another round of supervised topic modeling.
+
+Does Leiden a good algorithm for what we are doing? We want to measure network insularity of what we call network science. Right now, we are assuming that 'network science' is well approximated by the topic of 'Statistical Mechanics of Complex Networks'. But this community was found through the process explained above. What if patterns in citations changed overtime, so that a latent community splitted into two communities? Does the Leiden algorithm will find the dense community at first, and then disregard changes over time? 
 
 ## Looking at topic co-occurences for the beauty of it
 
