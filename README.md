@@ -1,5 +1,27 @@
 # Network Science Insularity
 
+In import, we can fetch data given a topic id
+
+```bash
+# fetching all papers in openAlex on Statistical Mechanics of Complex Networks 
+make import t10064
+```
+
+Once this is imported, we can grab all referenced works in those papers
+
+```bash
+# fetching all papers in openAlex on Statistical Mechanics of Complex Networks 
+make get-ref-works t10064
+```
+
+Or it is also possible to concatenate all years to get a clean dataframe of that topic
+
+```bash
+make concat t10064
+```
+
+<details><summary>How to get started with Observable Framework</summary>
+
 This is an [Observable Framework](https://observablehq.com/framework) project. To start the local preview server, run:
 
 ```
@@ -51,3 +73,5 @@ A typical Framework project looks like this:
 | `npm run deploy`     | Deploy your project to Observable                        |
 | `npm run clean`      | Clear the local data loader cache                        |
 | `npm run observable` | Run commands like `observable help`                      |
+
+</detail>

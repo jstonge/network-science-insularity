@@ -13,7 +13,7 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser("Data Downloader")
     parser.add_argument(
-        "-i", "--input", type=Path, help="output directory", required=True
+        "-t", "--topic", type=Path, help="output directory", required=True
     )
     parser.add_argument(
         "-o", "--output", type=Path, help="output directory", required=True
@@ -28,19 +28,19 @@ def main():
     that's 600,000 api calls. Perhaps it would be better to run this on our end.
     """
     args=parse_args()      
+    topic_id = args.topic
+    input_dir = Path("data/by_year")
     output_dir = args.output
-    # output_dir = Path("../../data/ref_works_by_year")
-    # year=args.year
-    # year=2007
-    for year in range(2007, 2011):
-        df = pd.read_parquet(f"../../data/by_year/t10064_{year}.parquet")
+    
+    for year in range(1994, 2010):
+        df = pd.read_parquet(input_dir / f"{topic_id}_{year}.parquet")
         df = df[df.language == 'en']
         
-        out_dir = output_dir / str(year)
-        out_dir.mkdir(exist_ok=True)
+        output_dir = output_dir / topic_id; output_dir.mkdir(exist_ok=True)
+        output_dir = output_dir / topic_id; output_dir.mkdir(exist_ok=True)
 
         # For each paper in that year for a given topic
-        for i,row in tqdm(df.iloc[1431:,:].iterrows(), total=len(df.iloc[1431:,:])):
+        for i,row in tqdm(df.iterrows(), total=len(df)):
             # get works reference by that paper
             w = Works()[row.id]
             ref_works = w.get('referenced_works', []) if w else []
@@ -58,7 +58,7 @@ def main():
                         continue
                 out = ref_works_details
 
-            with open(out_dir / f"{row.id.split('/')[-1]}.json", "w") as f:
+            with open(output_dir / f"{row.id.split('/')[-1]}.json", "w") as f:
                 json.dump(out, f)
 
 

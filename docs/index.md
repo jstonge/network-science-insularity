@@ -368,7 +368,7 @@ const degree = d3.rollup(
 ```
 
 ```js
-const selected_links = view(Inputs.search(nodes))
+const selected_links = view(Inputs.search(nodesRaw))
 ```
 
 <div class="card", style="padding:0">${
@@ -383,7 +383,7 @@ WHERE publication_year = ${sel_yr}
 ```
 
 ```js
-nodesRaw
+nodes
 ```
 
 ```sql id=[...selflinks]

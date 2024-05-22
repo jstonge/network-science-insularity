@@ -7,6 +7,7 @@ import requests
 from collections import Counter
 import json
 from pathlib import Path
+import argparse
 
 def get_counts(x, tot_count, field='topic'):
     if field == 'topic':
@@ -16,10 +17,22 @@ def get_counts(x, tot_count, field='topic'):
     for k in count.keys():
         tot_count[k] = tot_count.get(k, 0) + count[k]  
 
+def parse_args():
+    parser = argparse.ArgumentParser("Data Downloader")
+    parser.add_argument(
+        "-t", "--topic", type=str, help="topic id", required=True
+    )
+    parser.add_argument(
+        "-o", "--output", type=Path, help="output directory", required=True
+    )
+    return parser.parse_args()
 
 def main():
+    args = parse_args()
     input_dir = Path("data/ref_works_by_year")
-    output_dir = Path("docs/data/")
+    input_dir = input_dir / args.topic
+    output_dir = args.output
+    
     years = sorted([int(_.stem) for _ in input_dir.glob("*")])
     dfs = []
     for year in years:
