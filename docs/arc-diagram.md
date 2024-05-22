@@ -2,6 +2,7 @@
 toc: false
 sql: 
   stat_mech: ./data/stat_mech_networks_clean.parquet
+  timeseries: ./data/timeseries.parquet
 ---
 
 <style>
@@ -266,7 +267,52 @@ In this case, 8 papers out of 28 are directed inward at the subfield level (Stat
 
 ## Scaling up
 
-TODO
+We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
+
+```js
+Plot.plot({
+  y: {
+    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
+    },
+  fy: {
+    reverse: true
+  },
+  marginRight: 75,
+  marks: [
+    Plot.frame(),
+    Plot.dot(ts_data_prop, 
+      {x:"year", y:"outward_prop", stroke: "type", 
+      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.lineY(ts_data_prop, 
+      {x:"year", y:"outward_prop", stroke: "type", 
+      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.text(ts_data_prop, Plot.selectLast({
+      x:"year", y:"outward_prop", z: "type", fill: "type", strokeWidth: 0.6,
+      text: "type",
+      textAnchor: "start",
+      dx: 10
+    }))
+  ],
+  caption: "There are differences depending on how we aggregate the data. Keeping the most fine-grained level, that of topic, we can see that outward links (links toward other research communities) peak in 1998. At the most coarse-grained level, that peak happens in 1995. Why is that? This means that in 1995, 53% of outward citations in Statistical Mechanics of Complex Networks were not in the 'Physical Sciences'"
+})
+```
+
+```sql id=ts_data_prop display
+SELECT
+    year,
+    SUM(count) AS total_count,
+    SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END) AS inward_count,
+    (SUM(count) - SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END)) / SUM(count) AS outward_prop,
+    type
+FROM
+    timeseries
+GROUP BY
+    year, type;
+```
 
 ## Looking at topic co-occurences for the beauty of it
 

@@ -12,6 +12,7 @@ sql:
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-items: center;
   font-family: var(--sans-serif);
   margin: 4rem 0 8rem;
   text-wrap: balance;

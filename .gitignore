@@ -10,3 +10,8 @@ data/by_year/*
 data/*parquet
 
 data/dyn_sync_networks.parquet
+
+data/ref_works_by_year/
+src/import/
+workspace/
+__pycache__/import_topic_oa.cpython-311.pyc
