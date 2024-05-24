@@ -3,6 +3,7 @@ toc: false
 sql: 
   stat_mech: ./data/stat_mech_networks_clean.parquet
   dyn_sync: ./data/dyn_sync_networks_clean.parquet
+  css: ./data/t13910_clean.parquet
 ---
 
 
@@ -89,6 +90,41 @@ FROM stat_mech WHERE publication_year = ${year}
 
 ```js
 const selected_papers=view(Inputs.search(stat_mech, {label: "search table"}))
+```
+
+
+---
+
+## 10K papers from computational social science
+
+
+- [openAlex query](https://openalex.org/works?page=1&filter=primary_topic.id%3At10064)
+
+```sql id=[...rangeYr3]
+SELECT MIN(publication_year) as min_yr, MAX(publication_year) as max_yr FROM css
+```
+
+```js
+const year3 = view(Inputs.range([rangeYr3[0].min_yr,rangeYr3[0].max_yr], { step:1, value: 2000 }) )
+```
+
+```sql id=css
+SELECT 
+DISTINCT title, cited_by_count, publication_year, source, target, authorships
+FROM css WHERE publication_year = ${year3}
+```
+
+<div>${
+    resize((width) => plot_top_n(css, {width}))
+  }</div>
+<div class="card" style="padding:0">
+  ${
+    Inputs.table(selected_papers3)
+  }
+</div>
+
+```js
+const selected_papers3=view(Inputs.search(css, {label: "search table"}))
 ```
 
 

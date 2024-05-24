@@ -3,6 +3,7 @@ toc: false
 sql: 
   stat_mech: ./data/stat_mech_networks_clean.parquet
   timeseries: ./data/timeseries.parquet
+  inward_refs: ./data/inwards_refs_binary_ts.parquet
 ---
 
 <style>
@@ -47,6 +48,249 @@ sql:
 
 </style>
 
+
+```sql id=inward_refs
+SELECT * FROM inward_refs WHERE year > 1980
+```
+
+# Exploring complex networks related topics in OpenAlex
+
+
+We have the following question
+
+> Is network science became more _insular_ overtime? That is, is the physics of complex networks community was more outward looking at its inception than in recent years.
+
+Here is an idea to answer that question. Insularity here means something very close to network modularity. A community is modular when there is more edges within communities than across communities.  
+
+<img src="https://d3i71xaburhd42.cloudfront.net/2a91c8ff11a828209f10714cfc46fd929a51e9dc/1-Figure1-1.png" width=200></img> 
+
+Modularity maximization is an approach to community detection which propose cutting points to find the partition that maximize modularity. In the figure above, modularity is maximize by cutting through the five bridges that separate those 3 communities. 
+
+OpenAlex--an open database for scientific works--provide topics to classify scientific works, e.g. Knowledge Management and Organizational Innovation, Coronavirus Disease 2019, Swarm Intelligence Optimization Algorithms. It is the most fine-grained labels that they have to classify works. Each paper have multiple normalized scores for multiple topics, and openAlex defined the primary topic of a paper as the topic with the greatest score. Each topic is mapped onto a single subfield, which in turn belong to a single field (see [here](https://jstonge.observablehq.cloud/hello-research-groups/overthinking-fos#openalex-taxonomy) for the classification tree). There are 4516 topics, for 252 subfields, and 26 fields.
+
+Where do topics come from? They are clusters identified by maximizing modularity on the citation graph! OpenAlex researchers claim that this approach based on citation networks actually output research communities focused on different topics; they assume that researchers citing each other in a community will maximize modularity, and that this corresponds to topics. Once they have the communites, they ask GPT3.5 Turbo (🥲) to label them using titles (and abstract) from a representative samples of papers. Similarly, once they have the labeled communities (topics), they map those communities to known fields and subfields from SCOPUS, a well known bibliometric database. Although each paper has multiple topics, we will work with their primary topic. 
+
+Now, how does topics relate to the insularity of a field? One way to measure if a community is insular would be to look at how their _papers_ are outward looking. More precisely, our proposal to measure insularity is to look at the _number of works cited by a given paper within the same topic over papers with different topics_. A ratio of one means that a paper, which we assume belong to a given community, is engaging with as many papers within that community than with other communities. 
+
+Lets look at an example to help us understand the proposal. Linton Freeman article on "Centrality in social networks conceptual clarification" is characterized by the topic of _Statistical Mechanics of Complex Networks_.  This work from 1978 was cited 13 347. In return, it has cited 28 other papers, with the following counts with respect to other subfields:
+
+```
+{
+  'Economic Policy and Development Analysis': 1,
+  'Graph Spectra and Topological Indices': 2,
+  'Statistical Physics of Opinion Dynamics': 6,
+  'Graph Theory and Algorithms': 2,
+  'Temporal Dynamics of Team Processes and Performance': 3,
+  'Coopetition in Business Networks and Innovation': 1,
+  'Stochasticity in Gene Regulatory Networks': 1,
+  'The Impact of Digital Media on Public Discourse': 1,
+  'Integration of Cyber, Physical, and Social Systems': 1,
+  'Assessment of Sustainable Development Indicators and Strategies': 1,
+  'Intergroup Relations and Social Identity Theories': 1,
+  'Statistical Mechanics of Complex Networks': 2,
+  'Understanding Attitudes Towards Public Transport and Private Car': 1,
+  'Volunteered Geographic Information and Geospatial Crowdsourcing': 1,
+  'Distributed Constraint Optimization Problems and Algorithms': 1,
+  'Therapeutic Alliance in Psychotherapy': 1,
+  'Impact of Technological Revolutions on Global Economy': 1,
+  'Psychodynamic Psychotherapy and Developmental Trauma': 1
+ }
+```
+
+where 2 papers out of 28 are directed inward, meaning that they cite other papers within the same research communities. If we find topics to be too nitty-gritty, we can do the same exercice at the level of subfields:
+
+```
+{
+  'Economics and Econometrics': 1,
+  'Geometry and Topology': 2,
+  'Statistical and Nonlinear Physics': 8,
+  'Computational Theory and Mathematics': 2,
+  'Social Psychology': 3,
+  'Strategy and Management': 1,
+  'Molecular Biology': 1,
+  'Communication': 1,
+  'Control and Systems Engineering': 1,
+  'Management, Monitoring, Policy and Law': 1,
+  'Sociology and Political Science': 1,
+  'Transportation': 1,
+  'Geography, Planning and Development': 1,
+  'Computer Networks and Communications': 1,
+  'Clinical Psychology': 2,
+  'General Economics, Econometrics and Finance': 1
+}
+```
+
+In this case, 8 papers out of 28 are directed inward at the subfield level (Statistical Mechanics of Complex Networks has Statistical and Nonlinear Physics as subfield). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is both of the numbers above alot?  Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
+
+## Scaling up
+
+We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
+
+```js
+Plot.plot({
+  y: {
+    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
+    },
+  width: 1000,
+  height: 500,
+  marginRight: 300,
+  r: { range: [0,8] },
+  marks: [
+    Plot.lineY(inward_refs, 
+      {x:"year", y:"outward_prop",  stroke: "topic",
+      title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.dot(inward_refs, 
+      {x:"year", y:"outward_prop", r: "tot_ref_works_yr", stroke: "black", fill: "topic",
+      title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.text(inward_refs, Plot.selectLast({
+      x:"year", y:"outward_prop", z: "topic", fill: "topic", strokeWidth: 0.6,
+      text: "topic",
+      textAnchor: "start",
+      dx: 10
+    }))
+  ]
+})
+```
+
+## Scaling up with more details
+
+<div class="warning">2009 is the last year we have data for now. We are still collecting data from openAlex. The problem is that to do the figure below, we need to to query all referenced papers of all papers in a year (we need to know the topic of each referenced paper, which requires an API call). In 2018, there are 6055 papers labeled as `Statistical Mechanics of Complex Networks`. If there on average 50 references by paper, it means we need to call openAlex API 6055*50=300K times (openAlex limit is 100K API calls/day). We are working on a workaround (to have openAlex snapshot on the VACC), but right now this is how we roll. It takes forever.</div>
+
+Recall that each topic is mapped onto a subfield, field, and domain. Here, we can also know map the relationships across scales: 
+
+```js
+Plot.plot({
+  y: {
+    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
+    },
+  fy: {
+    reverse: true
+  },
+  marginRight: 75,
+  marks: [
+    Plot.frame(),
+    Plot.dot(ts_data_prop, 
+      {x:"year", y:"outward_prop", stroke: "type", 
+      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.lineY(ts_data_prop, 
+      {x:"year", y:"outward_prop", stroke: "type", 
+      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
+      tip: true}
+    ),
+    Plot.text(ts_data_prop, Plot.selectLast({
+      x:"year", y:"outward_prop", z: "type", fill: "type", strokeWidth: 0.6,
+      text: "type",
+      textAnchor: "start",
+      dx: 10
+    }))
+  ],
+  caption: "There are differences depending on how we aggregate the data. Keeping the most fine-grained level, that of topic, we can see that outward links (links toward other research communities) peak in 1998. At the most coarse-grained level, that peak happens in 1995. Why is that? This means that in 1995, 53% of outward citations in Statistical Mechanics of Complex Networks were not in the 'Physical Sciences'"
+})
+```
+
+We observe that there is a 38% (going from 95% in 1997 to 57% in 2009) drop in references going outside the `Statistical and Nonlinear Physics` research community. Is this alot? Is this an artefact of our method? Perhaps it has to do with how Leiden's clustering algorithm works with respect to evolving communities? 
+
+We can also look at where the outward links are going:
+
+TODO. For example, does the outward is now going towards, say, ecology, whereas it used to be sociology. Who knows.
+
+
+```sql id=ts_data_prop display
+SELECT
+    year,
+    SUM(count) AS total_count,
+    SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END) AS inward_count,
+    (SUM(count) - SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END)) / SUM(count) AS outward_prop,
+    type
+FROM
+    timeseries
+GROUP BY
+    year, type;
+```
+
+## Overthinking Leiden
+
+- [openAlex: End-to-End Process for Topic Classification](https://docs.google.com/document/d/1bDopkhuGieQ4F8gGNj7sEc8WSE8mvLZS/edit?usp=sharing&ouid=106329373929967149989&rtpof=true&sd=true)
+- [An open approach for classifying research publications](https://www.leidenmadtrics.nl/articles/an-open-approach-for-classifying-research-publications)
+- [From Louvain to Leiden: guaranteeing well-connected communities](https://www.nature.com/articles/s41598-019-41695-z)
+- [CWTSLeiden/publicationclassification](https://github.com/CWTSLeiden/publicationclassification)
+- [openAlex_topic_mapping_table](https://docs.google.com/spreadsheets/d/1v-MAq64x4YjhO7RWcB-yrKV5D_2vOOsxl4u6GBKEXY8/edit?usp=sharing)
+
+Leiden is a community-detection method that use modularity maximization to create communities. The network in question is 71 million nodes (journal articles, proceeding papers, preprting, and book chapters) and 1715 million edges (citation links), spanning from 2000 to 2023. The researchers who ran the clustering ended up with 4521 topics, or research areas, at the micro-level. 
+
+It is good to know that the topics seen on the openAlex API is the result of a two step process. The first step included all the papers that had incoming or outgoing citation data, which is a third of the data available in openAlex. The network was cast as undirected, meaning that we won't know if some communities acted as a sink and others as a source. It seems to be a common theme to forbid directedness as networks grow. Hric et al (2018) also cast their 630M citations network as undirected (and backboned) when extracting research communities using hierarchical SBM.
+
+As a second step, OpenAlex folks extended the labeling by first embedding combinations of journal title, abstract (when available), and journal names using [setence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), then use that as feature to do another round of supervised topic modeling.
+
+Does Leiden a good algorithm for what we are doing? We want to measure network insularity of what we call network science. Right now, we are assuming that 'network science' is well approximated by the topic of 'Statistical Mechanics of Complex Networks'. But this community was found through the process explained above. What if patterns in citations changed overtime, so that a latent community splitted into two communities? Does the Leiden algorithm will find the dense community at first, and then disregard changes over time? 
+
+## Looking at topic co-occurences for the beauty of it
+
+```js
+const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
+```
+
+<div class="grid grid-cols-2">
+  <div>
+    The arc diagram displays subfields co-occurences within paper with <em>Statistical mechanics of complex networks</em> as primary topic. Nodes are colored according to their field of research. This is a very neat way to know which subfields tend to show up together. 
+  </div>
+  <div>${
+    resize((width) => arc(nodes, links, {width}))
+  }
+  </div>
+</div>
+
+```js
+const degree = d3.rollup(
+  links.flatMap(({ source, target, value }) => [
+    { node: source, value },
+    { node: target, value }
+  ]),
+  (v) => d3.sum(v, ({ value }) => value),
+  ({ node }) => node
+);
+```
+
+```js
+  const orders = new Map([
+    ["by name", d3.sort(nodes.map((d) => d.id))],
+    ["by group", d3.sort(nodes, ({group}) => group, ({id}) => id).map(({id}) => id)],
+    ["by degree", d3.sort(nodes, ({id}) => degree.get(id), ({id}) => id).map(({id}) => id).reverse()]
+  ]);
+```
+
+```js
+const selected_links = view(Inputs.search(nodesRaw))
+```
+
+<div class="card", style="padding:0">${
+  Inputs.table(selected_links)
+}
+</div>
+
+```sql id=[...nodesRaw]
+SELECT DISTINCT title, cited_by_count, subfield
+FROM stat_mech
+WHERE publication_year = ${sel_yr}
+```
+
+```js
+nodes
+```
+
+```sql id=[...selflinks]
+SELECT COUNT(*) as value, source, target 
+FROM stat_mech 
+WHERE publication_year = ${sel_yr} AND source = target 
+GROUP BY source, target
+```
+
 ```js
 import * as d3 from "npm:d3";
 ```
@@ -70,7 +314,6 @@ WHERE publication_year = ${sel_yr} AND source != target
 GROUP BY source, target
 ```
 
-# Exploring complex networks related topics in OpenAlex
 
 ```js
 function arc(nodes, edges, {width} = {}) {
@@ -198,198 +441,3 @@ function update(order) {
 }
 
 ```
-
-We have the following question
-
-> Is network science became more _insular_ overtime? That is, is the physics of complex networks community was more outward looking at its inception than in recent years.
-
-Here is an idea to answer that question. Insularity here means something very close to network modularity. A community is modular when there is more edges within communities than across communities.  
-
-<img src="https://d3i71xaburhd42.cloudfront.net/2a91c8ff11a828209f10714cfc46fd929a51e9dc/1-Figure1-1.png" width=200></img> 
-
-Modularity maximization is an approach to community detection which propose cutting points to find the partition that maximize modularity. In the figure above, modularity is maximize by cutting through the five bridges that separate those 3 communities. 
-
-OpenAlex--an open database for scientific works--provide topics to classify scientific works, e.g. Knowledge Management and Organizational Innovation, Coronavirus Disease 2019, Swarm Intelligence Optimization Algorithms. It is the most fine-grained labels that they have to classify works. Each paper have multiple normalized scores for multiple topics, and openAlex defined the primary topic of a paper as the topic with the greatest score. Each topic is mapped onto a single subfield, which in turn belong to a single field (see [here](https://jstonge.observablehq.cloud/hello-research-groups/overthinking-fos#openalex-taxonomy) for the classification tree). There are 4516 topics, for 252 subfields, and 26 fields.
-
-Where do topics come from? They are clusters identified by maximizing modularity on the citation graph! OpenAlex researchers claim that this approach based on citation networks actually output research communities focused on different topics; they assume that researchers citing each other in a community will maximize modularity, and that this corresponds to topics. Once they have the communites, they ask GPT3.5 Turbo (🥲) to label them using titles (and abstract) from a representative samples of papers. Similarly, once they have the labeled communities (topics), they map those communities to known fields and subfields from SCOPUS, a well known bibliometric database. Although each paper has multiple topics, we will work with their primary topic. 
-
-Now, how does topics relate to the insularity of a field? One way to measure if a community is insular would be to look at how their _papers_ are outward looking. More precisely, our proposal to measure insularity is to look at the _number of works cited by a given paper within the same topic over papers with different topics_. A ratio of one means that a paper, which we assume belong to a given community, is engaging with as many papers within that community than with other communities. 
-
-Lets look at an example to help us understand the proposal. Linton Freeman article on "Centrality in social networks conceptual clarification" is characterized by the topic of _Statistical Mechanics of Complex Networks_.  This work from 1978 was cited 13 347. In return, it has cited 28 other papers, with the following counts with respect to other subfields:
-
-```
-{
-  'Economic Policy and Development Analysis': 1,
-  'Graph Spectra and Topological Indices': 2,
-  'Statistical Physics of Opinion Dynamics': 6,
-  'Graph Theory and Algorithms': 2,
-  'Temporal Dynamics of Team Processes and Performance': 3,
-  'Coopetition in Business Networks and Innovation': 1,
-  'Stochasticity in Gene Regulatory Networks': 1,
-  'The Impact of Digital Media on Public Discourse': 1,
-  'Integration of Cyber, Physical, and Social Systems': 1,
-  'Assessment of Sustainable Development Indicators and Strategies': 1,
-  'Intergroup Relations and Social Identity Theories': 1,
-  'Statistical Mechanics of Complex Networks': 2,
-  'Understanding Attitudes Towards Public Transport and Private Car': 1,
-  'Volunteered Geographic Information and Geospatial Crowdsourcing': 1,
-  'Distributed Constraint Optimization Problems and Algorithms': 1,
-  'Therapeutic Alliance in Psychotherapy': 1,
-  'Impact of Technological Revolutions on Global Economy': 1,
-  'Psychodynamic Psychotherapy and Developmental Trauma': 1
- }
-```
-
-where 2 papers out of 28 are directed inward, meaning that they cite other papers within the same research communities. If we find topics to be too nitty-gritty, we can do the same exercice at the level of subfields:
-
-```
-{
-  'Economics and Econometrics': 1,
-  'Geometry and Topology': 2,
-  'Statistical and Nonlinear Physics': 8,
-  'Computational Theory and Mathematics': 2,
-  'Social Psychology': 3,
-  'Strategy and Management': 1,
-  'Molecular Biology': 1,
-  'Communication': 1,
-  'Control and Systems Engineering': 1,
-  'Management, Monitoring, Policy and Law': 1,
-  'Sociology and Political Science': 1,
-  'Transportation': 1,
-  'Geography, Planning and Development': 1,
-  'Computer Networks and Communications': 1,
-  'Clinical Psychology': 2,
-  'General Economics, Econometrics and Finance': 1
-}
-```
-
-In this case, 8 papers out of 28 are directed inward at the subfield level (Statistical Mechanics of Complex Networks has Statistical and Nonlinear Physics as subfield). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is both of the numbers above alot?  Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
-
-## Scaling up
-
-<div class="warning">2009 is the last year we have data for now. We are still collecting data from openAlex. The problem is that to do the figure below, we need to to query all referenced papers of all papers in a year (we need to know the topic of each referenced paper, which requires an API call). In 2018, there are 6055 papers labeled as `Statistical Mechanics of Complex Networks`. If there on average 50 references by paper, it means we need to call openAlex API 6055*50=300K times (openAlex limit is 100K API calls/day). We are working on a workaround (to have openAlex snapshot on the VACC), but right now this is how we roll. It takes forever.</div>
-
-We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
-
-```js
-Plot.plot({
-  y: {
-    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
-    },
-  fy: {
-    reverse: true
-  },
-  marginRight: 75,
-  marks: [
-    Plot.frame(),
-    Plot.dot(ts_data_prop, 
-      {x:"year", y:"outward_prop", stroke: "type", 
-      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
-      tip: true}
-    ),
-    Plot.lineY(ts_data_prop, 
-      {x:"year", y:"outward_prop", stroke: "type", 
-      title: d => `Out of ${d.total_count} outgoing citations, ${d.inward_count} were directed within the research community.`, 
-      tip: true}
-    ),
-    Plot.text(ts_data_prop, Plot.selectLast({
-      x:"year", y:"outward_prop", z: "type", fill: "type", strokeWidth: 0.6,
-      text: "type",
-      textAnchor: "start",
-      dx: 10
-    }))
-  ],
-  caption: "There are differences depending on how we aggregate the data. Keeping the most fine-grained level, that of topic, we can see that outward links (links toward other research communities) peak in 1998. At the most coarse-grained level, that peak happens in 1995. Why is that? This means that in 1995, 53% of outward citations in Statistical Mechanics of Complex Networks were not in the 'Physical Sciences'"
-})
-```
-
-We observe that there is a 38% (going from 95% in 1997 to 57% in 2009) drop in references going outside the `Statistical and Nonlinear Physics` research community. Is this alot? Is this an artefact of our method? Perhaps it has to do with how Leiden's clustering algorithm works with respect to evolving communities? 
-
-```sql id=ts_data_prop display
-SELECT
-    year,
-    SUM(count) AS total_count,
-    SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END) AS inward_count,
-    (SUM(count) - SUM(CASE WHEN category in ('Statistical Mechanics of Complex Networks', 'Statistical and Nonlinear Physics', 'Physics and Astronomy', 'Physical Sciences') THEN count ELSE 0 END)) / SUM(count) AS outward_prop,
-    type
-FROM
-    timeseries
-GROUP BY
-    year, type;
-```
-
-## Overthinking Leiden
-
-- [openAlex: End-to-End Process for Topic Classification](https://docs.google.com/document/d/1bDopkhuGieQ4F8gGNj7sEc8WSE8mvLZS/edit?usp=sharing&ouid=106329373929967149989&rtpof=true&sd=true)
-- [An open approach for classifying research publications](https://www.leidenmadtrics.nl/articles/an-open-approach-for-classifying-research-publications)
-- [From Louvain to Leiden: guaranteeing well-connected communities](https://www.nature.com/articles/s41598-019-41695-z)
-- [CWTSLeiden/publicationclassification](https://github.com/CWTSLeiden/publicationclassification)
-- [openAlex_topic_mapping_table](https://docs.google.com/spreadsheets/d/1v-MAq64x4YjhO7RWcB-yrKV5D_2vOOsxl4u6GBKEXY8/edit?usp=sharing)
-
-Leiden is a community-detection method that use modularity maximization to create communities. The network in question is 71 million nodes (journal articles, proceeding papers, preprting, and book chapters) and 1715 million edges (citation links), spanning from 2000 to 2023. The researchers who ran the clustering ended up with 4521 topics, or research areas, at the micro-level. 
-
-It is good to know that the topics seen on the openAlex API is the results of a two step process. The first step included all the papers that had incoming or outgoing citation data, which is a third of the data available in openAlex. As a second step, OpenAlex folks extended the labeling by first embedding combinations of journal title, abstract (when available), and journal names using [setence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2), then use that as feature to do another round of supervised topic modeling.
-
-Does Leiden a good algorithm for what we are doing? We want to measure network insularity of what we call network science. Right now, we are assuming that 'network science' is well approximated by the topic of 'Statistical Mechanics of Complex Networks'. But this community was found through the process explained above. What if patterns in citations changed overtime, so that a latent community splitted into two communities? Does the Leiden algorithm will find the dense community at first, and then disregard changes over time? 
-
-## Looking at topic co-occurences for the beauty of it
-
-```js
-const sel_yr = view(Inputs.range([1990, 2020], {step:1}))
-```
-
-<div class="grid grid-cols-2">
-  <div>
-    The arc diagram displays subfields co-occurences within paper with <em>Statistical mechanics of complex networks</em> as primary topic. Nodes are colored according to their field of research. This is a very neat way to know which subfields tend to show up together. 
-  </div>
-  <div>${
-    resize((width) => arc(nodes, links, {width}))
-  }
-  </div>
-</div>
-
-```js
-const degree = d3.rollup(
-  links.flatMap(({ source, target, value }) => [
-    { node: source, value },
-    { node: target, value }
-  ]),
-  (v) => d3.sum(v, ({ value }) => value),
-  ({ node }) => node
-);
-```
-
-```js
-  const orders = new Map([
-    ["by name", d3.sort(nodes.map((d) => d.id))],
-    ["by group", d3.sort(nodes, ({group}) => group, ({id}) => id).map(({id}) => id)],
-    ["by degree", d3.sort(nodes, ({id}) => degree.get(id), ({id}) => id).map(({id}) => id).reverse()]
-  ]);
-```
-
-```js
-const selected_links = view(Inputs.search(nodesRaw))
-```
-
-<div class="card", style="padding:0">${
-  Inputs.table(selected_links)
-}
-</div>
-
-```sql id=[...nodesRaw]
-SELECT DISTINCT title, cited_by_count, subfield
-FROM stat_mech
-WHERE publication_year = ${sel_yr}
-```
-
-```js
-nodes
-```
-
-```sql id=[...selflinks]
-SELECT COUNT(*) as value, source, target 
-FROM stat_mech 
-WHERE publication_year = ${sel_yr} AND source = target 
-GROUP BY source, target
-```
-

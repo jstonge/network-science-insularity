@@ -32,7 +32,7 @@ def main():
     output = args.output
     input_f = Path("data") / f"{topic_id}.parquet"
     df = pd.read_parquet(input_f)
-
+    print(len(df))
     subfield2field = {}
     for topics in df.topics:
         for topic in topics:
@@ -60,3 +60,5 @@ def main():
 
     tidy_df.to_parquet(output / f"{topic_id}_clean.parquet")
 
+if __name__ == "__main__":
+    main()
