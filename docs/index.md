@@ -169,7 +169,7 @@ function lineplot() {
   return Plot.plot({
     color: {legend: true},
     y: {grid:true, label: "Cumulative number of papers", type: isLog ? "log" : "linear", nice:true },
-    // x: {axis: null},
+    x: {axis: null},
     // nice: true,
     inset: 10, 
     width: 1200,
