@@ -1,7 +1,7 @@
 ---
 toc: false
 sql: 
-  css: ./data/t13910_clean.parquet
+  stat_mech: ./data/t10064_clean.parquet
 ---
 
 
@@ -117,8 +117,7 @@ function plot_top_n(data, {width} = {}) {
         x: "cited_by_count",
         y: "title",
         textAnchor: "start",
-        dx: 3,
-        fill: "black"
+        dx: 3
       })
     ]
   })

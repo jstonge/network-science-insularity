@@ -1,23 +1,22 @@
 # Network Science Insularity
 
-In import, we can fetch data given a topic id
+We can fetch data given a topic id as follow
 
 ```bash
 # fetching all papers in openAlex on Statistical Mechanics of Complex Networks 
 make import topic=t10064
 ```
 
-Once this is imported, we can grab all referenced works in those papers
+To visualize top N papers in the app, we do
 
 ```bash
-# fetching all papers in openAlex on Statistical Mechanics of Complex Networks 
-make get-ref-works topic=t10064
+make preprocess topic=t10064
 ```
 
-Or it is also possible to concatenate all years to get a clean dataframe of that topic
+To add a new topic to the insularity plot, we do:
 
 ```bash
-make concat topic=t10064
+ref-works-binary topic=t10064
 ```
 
 <details><summary>How to get started with Observable Framework</summary>

@@ -14,7 +14,7 @@ SCRIPT_DIR=./src
 #                    #
 ######################
 
-.PHONY: update-timeline
+.PHONY: ref-works-binary clean import get-ref-works concat preprocess
 
 ref-works-binary: 
 	python $(SCRIPT_DIR)/import/import.py -t $(topic) -o $(DATA_DIR_BY_YEAR)
@@ -26,6 +26,7 @@ clean:
 
 import:
 	python $(SCRIPT_DIR)/import/import.py -t $(topic) -o $(DATA_DIR_BY_YEAR)
+	python -c "import pandas as pd; from pathlib import Path; pd.concat([pd.read_parquet(_) for _ in Path('data/by_year/$(topic)').glob('*')], axis=0).to_parquet('data/$(topic).parquet')"
 
 get-ref-works:
 	python $(SCRIPT_DIR)/import/referenced_works.py -t $(topic) -o $(DATA_DIR_REF_WORKS)
