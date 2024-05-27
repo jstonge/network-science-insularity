@@ -206,13 +206,17 @@ Plot.plot({
       {x:"year", y:"outward_prop", r: "tot_ref_works_yr", stroke: "black", fill: "topic",
       title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
       tip: true}
-    )
-    // Plot.text(inward_refs, Plot.selectLast({
-    //   x:"year", y:"outward_prop", z: "topic", fill: "topic", strokeWidth: 0.6,
-    //   text: "topic",
-    //   textAnchor: "start",
-    //   dx: 10
-    // }))
+    ),
+    Plot.text(
+      [ 
+        "← classified in topics using title and abstract", 
+        "clustered using Leiden when inward and outward links →"
+      ], {
+        x: [1994, 2007], 
+        y: [0.03, 0.03],
+        fontSize: 10,
+      }),
+    Plot.ruleX([2000], {strokeOpacity: 0.6, strokeDasharray: 3}),
   ]
 })
 ```
