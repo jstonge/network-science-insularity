@@ -1,7 +1,7 @@
 ---
 toc: false
 sql: 
-  stat_mech: ./data/stat_mech_networks_clean.parquet
+  stat_mech: ./data/t10064_clean.parquet
   timeseries: ./data/timeseries.parquet
   inward_refs: ./data/inwards_refs_binary_ts.parquet
 ---
