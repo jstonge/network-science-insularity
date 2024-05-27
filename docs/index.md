@@ -48,9 +48,29 @@ sql:
 
 </style>
 
-
-```sql id=inward_refs
-SELECT * FROM inward_refs WHERE year > 1980
+```sql id=inward_refs display
+WITH cumulativeSum AS (
+    SELECT 
+        topic,
+        SUM(tot_works) AS cum_sum
+    FROM 
+        inward_refs
+      GROUP BY topic
+)
+SELECT 
+    p.*, 
+    CASE 
+        WHEN cum_sum > 50000 THEN 'Yes'
+        ELSE 'No'
+    END AS is_big
+FROM 
+    inward_refs as p
+LEFT JOIN 
+  cumulativeSum cs
+ON 
+  p.topic = cs.topic
+WHERE p.year  > 1970 AND p.year < 2024 AND p.outward_prop != 0
+ORDER BY p.topic, p.year;
 ```
 
 # Exploring complex networks related topics in OpenAlex
@@ -127,13 +147,54 @@ In this case, 8 papers out of 28 are directed inward at the subfield level (Stat
 We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
 
 ```js
+const toggle = view(Inputs.toggle({label: "Cumulative sum"}))
+```
+```js
+const isLog = view(Inputs.toggle({label: "log", value: true}))
+```
+
+```js
+lineplot()
+```
+
+```js
+function lineplot() {
+  const line_mark = toggle ?
+   Plot.line(inward_refs, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", stroke: "topic" })) :
+   Plot.line(inward_refs, {x:"year", y:"tot_works", stroke: "topic" })
+  const dot_mark = toggle ? 
+    Plot.dot(inward_refs, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", stroke: "topic" })) :
+    Plot.dot(inward_refs, {x:"year", y:"tot_works", stroke: "topic" })
+  
+  return Plot.plot({
+    color: {legend: true},
+    y: {grid:true, label: "Cumulative number of papers", type: isLog ? "log" : "linear", nice:true },
+    // x: {axis: null},
+    // nice: true,
+    inset: 10, 
+    width: 1200,
+    height: 200,
+    marginLeft: 50,
+    marks: [
+      Plot.frame(),
+      line_mark,
+      dot_mark
+    ]
+  })
+
+}
+```
+
+```js
 Plot.plot({
   y: {
     grid:true, percent: true, label: "outward link (%)", domain: [0,100]
     },
-  width: 1000,
+  inset: 10,
+  // nice: true,
+  marginLeft: 50,
+  width: 1200,
   height: 500,
-  marginRight: 300,
   r: { range: [0,8] },
   marks: [
     Plot.lineY(inward_refs, 
@@ -145,16 +206,17 @@ Plot.plot({
       {x:"year", y:"outward_prop", r: "tot_ref_works_yr", stroke: "black", fill: "topic",
       title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
       tip: true}
-    ),
-    Plot.text(inward_refs, Plot.selectLast({
-      x:"year", y:"outward_prop", z: "topic", fill: "topic", strokeWidth: 0.6,
-      text: "topic",
-      textAnchor: "start",
-      dx: 10
-    }))
+    )
+    // Plot.text(inward_refs, Plot.selectLast({
+    //   x:"year", y:"outward_prop", z: "topic", fill: "topic", strokeWidth: 0.6,
+    //   text: "topic",
+    //   textAnchor: "start",
+    //   dx: 10
+    // }))
   ]
 })
 ```
+
 
 ## Scaling up with more details
 
@@ -198,7 +260,7 @@ We observe that there is a 38% (going from 95% in 1997 to 57% in 2009) drop in r
 
 We can also look at where the outward links are going:
 
-TODO. For example, does the outward is now going towards, say, ecology, whereas it used to be sociology. Who knows.
+TODO. For example, does the outward is now going towards, say, ecology, whereas it used to be sociology. Who knows. 
 
 
 ```sql id=ts_data_prop display

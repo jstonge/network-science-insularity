@@ -14,6 +14,13 @@ SCRIPT_DIR=./src
 #                    #
 ######################
 
+.PHONY: update-timeline
+
+ref-works-binary: 
+	python $(SCRIPT_DIR)/import/import.py -t $(topic) -o $(DATA_DIR_BY_YEAR)
+	python -c "import pandas as pd; from pathlib import Path; pd.concat([pd.read_parquet(_) for _ in Path('data/by_year/$(topic)').glob('*')], axis=0).to_parquet('data/$(topic).parquet')"
+	python $(SCRIPT_DIR)/import/binary_ref_works.py -i $(DATA_DIR) -o $(DATA_DIR_OBS)
+
 clean:
 	rm -rf docs/.observablehq/cache
 
