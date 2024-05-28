@@ -48,47 +48,25 @@ sql:
 
 </style>
 
-```sql id=inward_refs display
-WITH cumulativeSum AS (
-    SELECT 
-        topic,
-        SUM(tot_works) AS cum_sum
-    FROM 
-        inward_refs
-      GROUP BY topic
-)
-SELECT 
-    p.*, 
-    CASE 
-        WHEN cum_sum > 50000 THEN 'Yes'
-        ELSE 'No'
-    END AS is_big
-FROM 
-    inward_refs as p
-LEFT JOIN 
-  cumulativeSum cs
-ON 
-  p.topic = cs.topic
-WHERE p.year  > 1970 AND p.year < 2024 AND p.outward_prop != 0
-ORDER BY p.topic, p.year;
-```
 
 # Exploring complex networks related topics in OpenAlex
 
 
 We have the following question
 
-> Is network science became more _insular_ overtime? That is, is the physics of complex networks community was more outward looking at its inception than in recent years.
+> Is network science becaming more _insular_ overtime? That is, is the `physics of complex networks community`, the topic that seems to match the network science community, is becoming more 'inward looking' in recent years.
 
 Here is an idea to answer that question. Insularity here means something very close to network modularity. A community is modular when there is more edges within communities than across communities.  
 
 <img src="https://d3i71xaburhd42.cloudfront.net/2a91c8ff11a828209f10714cfc46fd929a51e9dc/1-Figure1-1.png" width=200></img> 
 
-Modularity maximization is an approach to community detection which propose cutting points to find the partition that maximize modularity. In the figure above, modularity is maximize by cutting through the five bridges that separate those 3 communities. 
+Modularity maximization is an approach to community detection that identify the partitions that maximize modularity. To find those partitions, it uses finding cutpoints. In the figure above, modularity is maximized by cutting through the five bridges that separate those 3 communities. 
 
-OpenAlex--an open database for scientific works--provide topics to classify scientific works, e.g. Knowledge Management and Organizational Innovation, Coronavirus Disease 2019, Swarm Intelligence Optimization Algorithms. It is the most fine-grained labels that they have to classify works. Each paper have multiple normalized scores for multiple topics, and openAlex defined the primary topic of a paper as the topic with the greatest score. Each topic is mapped onto a single subfield, which in turn belong to a single field (see [here](https://jstonge.observablehq.cloud/hello-research-groups/overthinking-fos#openalex-taxonomy) for the classification tree). There are 4516 topics, for 252 subfields, and 26 fields.
+OpenAlex--an open database for scientific works--provide topics to classify scientific works, e.g. Knowledge Management and Organizational Innovation, Coronavirus Disease 2019, Swarm Intelligence Optimization Algorithms. Topics are the most fine-grained labels that they have to classify works. Each paper have multiple normalized scores for multiple topics, and openAlex defined the primary topic of a paper as the topic with the greatest score. Each topic is mapped onto a single subfield, which in turn belong to a single field (see [here](https://jstonge.observablehq.cloud/hello-research-groups/overthinking-fos#openalex-taxonomy) for the classification tree). There are 4516 topics, for 252 subfields, and 26 fields.
 
-Where do topics come from? They are clusters identified by maximizing modularity on the citation graph! OpenAlex researchers claim that this approach based on citation networks actually output research communities focused on different topics; they assume that researchers citing each other in a community will maximize modularity, and that this corresponds to topics. Once they have the communites, they ask GPT3.5 Turbo (🥲) to label them using titles (and abstract) from a representative samples of papers. Similarly, once they have the labeled communities (topics), they map those communities to known fields and subfields from SCOPUS, a well known bibliometric database. Although each paper has multiple topics, we will work with their primary topic. 
+Where do topics come from? They are clusters identified by maximizing modularity on the citation graph! OpenAlex researchers claim that this approach based on citation networks actually output research communities focused on different topics; they assume that researchers citing each other in a community will maximize modularity, and that this corresponds to topics. 
+
+Once they have the communites, they ask GPT3.5 Turbo (🥲) to label them using titles (and abstract) from a representative samples of papers. Similarly, once they have the labeled communities (topics), they map those communities to known fields and subfields from SCOPUS, a well known bibliometric database. For now, we work openAlex primary topics. 
 
 Now, how does topics relate to the insularity of a field? One way to measure if a community is insular would be to look at how their _papers_ are outward looking. More precisely, our proposal to measure insularity is to look at the _number of works cited by a given paper within the same topic over papers with different topics_. A ratio of one means that a paper, which we assume belong to a given community, is engaging with as many papers within that community than with other communities. 
 
@@ -117,7 +95,149 @@ Lets look at an example to help us understand the proposal. Linton Freeman artic
  }
 ```
 
-where 2 papers out of 28 are directed inward, meaning that they cite other papers within the same research communities. If we find topics to be too nitty-gritty, we can do the same exercice at the level of subfields:
+where 2 papers out of 28 are directed inward, meaning that they cite other papers within the same research communities. 
+
+## Scaling up
+
+We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
+
+```sql id=[...uniqTopic]
+SELECT COUNT(topic) as n, topic FROM inward_refs GROUP BY topic ORDER BY topic
+```
+
+```js
+const select = view(Inputs.select(uniqTopic.map(d=>d.topic), {multiple: 4}))
+```
+
+```js
+const sel_topic = select.length === 0 ? 
+  [
+    'Dynamics of Synchronization in Complex Networks', 'Statistical Mechanics of Complex Networks', 
+    'Chaos Synchronization and Control in Complex Systems', 'Statistical Physics of Opinion Dynamics', 
+    'Theoretical and Computational Physics'
+  ] : select
+```
+
+```js
+const f = view(Inputs.form({
+  toggle: Inputs.toggle({label: "Cumulative sum"}),
+  isLog: Inputs.toggle({label: "log", value: true}),
+  filterSize: Inputs.select(['', 'Large','Small'], {label: "filter by size"})
+
+}))
+```
+
+```js
+const data_f = f.filterSize === '' ?  
+  [...inward_refs].filter(d=>sel_topic.includes(d.topic)) : 
+  [...inward_refs].filter(d=>sel_topic.includes(d.topic) & d.is_big === f.filterSize)
+```
+
+```js
+cumulativelineplot()
+```
+
+```js
+function cumulativelineplot() {
+  const line_mark = f.toggle ?
+   Plot.line(data_f, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", stroke: "topic", tip: true })) :
+   Plot.line(data_f, {x:"year", y:"tot_works", stroke: "topic", tip: true })
+  const dot_mark = f.toggle ? 
+    Plot.dot(data_f, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", fill: "topic", stroke: "black", strokeWidth: 0.6, tip: true })) :
+    Plot.dot(data_f, {x:"year", y:"tot_works", fill: "topic", stroke: "black", strokeWidth: 0.6, tip: true })
+  
+  return Plot.plot({
+    color: {legend: true},
+    y: {grid:true, label: "Cumulative number of papers", type: f.isLog ? "log" : "linear", nice:true },
+    x: {axis: null, grid: true},
+    marginBottom: 0,
+    inset: 10, 
+    width: 1200,
+    height: 200,
+    marginLeft: 50,
+    marginRight: 20,
+    marks: [
+      Plot.frame(),
+      line_mark,
+      dot_mark,
+      Plot.ruleX([2000], {strokeOpacity: 0.6, strokeDasharray: 3}),
+    ]
+  })
+
+}
+```
+
+```js
+Plot.plot({
+  y: {
+    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
+    },
+  x: {label: null, grid: true},
+  inset: 10,
+  marginLeft: 50,
+  width: 1200,
+  height: 500,
+  r: { range: [0,8] },
+  marks: [
+    Plot.lineY(data_f, 
+      {x:"year", y:"outward_prop",  stroke: "topic",
+      tip: true}
+    ),
+    Plot.dot(data_f, 
+      {x:"year", y:"outward_prop", r: "tot_ref_works_yr", stroke: "black", fill: "topic", strokeWidth: 0.6, 
+      tip: true}
+    ),
+    Plot.text(
+      [ 
+        "← classified in topics using title and abstract", 
+        "clustered using Leiden when inward and outward links →"
+      ], {
+        x: [1994, 2007], 
+        y: [0.03, 0.03],
+        fontSize: 10,
+      }),
+    Plot.ruleX([2000], {strokeOpacity: 0.6, strokeDasharray: 3}),
+  ]
+})
+```
+
+Other questions that come to my mind:
+
+- `insularity at country level`: For Statistical Mechanics of Complex Networks, is the community insular with respect to the world?
+- `insularity at field level`: Does insularity differs across fields (e.g. humanities vs social sciences vs STEM vs biomed)?
+
+```sql id=inward_refs
+WITH cumulativeSum AS (
+    SELECT 
+        topic,
+        SUM(tot_works) AS cum_sum
+    FROM 
+        inward_refs
+      GROUP BY topic
+)
+SELECT 
+    p.*, 
+    CASE 
+        WHEN cum_sum > 20000 THEN 'Large'
+        ELSE 'Small'
+    END AS is_big
+FROM 
+    inward_refs as p
+LEFT JOIN 
+  cumulativeSum cs
+ON 
+  p.topic = cs.topic
+WHERE p.year  > 1970 AND p.year < 2024 AND p.outward_prop != 0
+ORDER BY p.topic, p.year;
+```
+
+
+## Scaling up with more details
+
+<div class="warning">2009 is the last year we have data for now. We are still collecting data from openAlex. The problem is that to do the figure below, we need to to query all referenced papers of all papers in a year (we need to know the topic of each referenced paper, which requires an API call). In 2018, there are 6055 papers labeled as `Statistical Mechanics of Complex Networks`. If there on average 50 references by paper, it means we need to call openAlex API 6055*50=300K times (openAlex limit is 100K API calls/day). We are working on a workaround (to have openAlex snapshot on the VACC), but right now this is how we roll. It takes forever.</div>
+
+
+Recall that each topic is mapped onto a subfield, field, and domain. If we find topics to be too nitty-gritty, we can do the same exercice at the level of subfields:
 
 ```
 {
@@ -142,91 +262,7 @@ where 2 papers out of 28 are directed inward, meaning that they cite other paper
 
 In this case, 8 papers out of 28 are directed inward at the subfield level (Statistical Mechanics of Complex Networks has Statistical and Nonlinear Physics as subfield). In terms of ratio, this means that for each paper cited within the `Statistical and Nonlinear Physics`, there was 2.5 papers cited outside the community. Is both of the numbers above alot?  Lets first do the same for all papers in `Statistical and Nonlinear Physics` for, say, 1990 and 2015, and then think about some kind of null models that would tell us something about insularity of the community.  
 
-## Scaling up
-
-We do the same exercice, but now for each year we count the total number of outward references for all works within the `Statistical and Nonlinear Physics` research communities.
-
-```js
-const toggle = view(Inputs.toggle({label: "Cumulative sum"}))
-```
-```js
-const isLog = view(Inputs.toggle({label: "log", value: true}))
-```
-
-```js
-lineplot()
-```
-
-```js
-function lineplot() {
-  const line_mark = toggle ?
-   Plot.line(inward_refs, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", stroke: "topic" })) :
-   Plot.line(inward_refs, {x:"year", y:"tot_works", stroke: "topic" })
-  const dot_mark = toggle ? 
-    Plot.dot(inward_refs, Plot.map({y: "cumsum"}, {x:"year", y:"tot_works", stroke: "topic" })) :
-    Plot.dot(inward_refs, {x:"year", y:"tot_works", stroke: "topic" })
-  
-  return Plot.plot({
-    color: {legend: true},
-    y: {grid:true, label: "Cumulative number of papers", type: isLog ? "log" : "linear", nice:true },
-    x: {axis: null},
-    // nice: true,
-    inset: 10, 
-    width: 1200,
-    height: 200,
-    marginLeft: 50,
-    marks: [
-      Plot.frame(),
-      line_mark,
-      dot_mark
-    ]
-  })
-
-}
-```
-
-```js
-Plot.plot({
-  y: {
-    grid:true, percent: true, label: "outward link (%)", domain: [0,100]
-    },
-  inset: 10,
-  // nice: true,
-  marginLeft: 50,
-  width: 1200,
-  height: 500,
-  r: { range: [0,8] },
-  marks: [
-    Plot.lineY(inward_refs, 
-      {x:"year", y:"outward_prop",  stroke: "topic",
-      title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
-      tip: true}
-    ),
-    Plot.dot(inward_refs, 
-      {x:"year", y:"outward_prop", r: "tot_ref_works_yr", stroke: "black", fill: "topic",
-      title: d => `Out of ${d.tot_ref_works_yr} outgoing citations, ${d.nb_inward_ref_works} were directed within the research community.`, 
-      tip: true}
-    ),
-    Plot.text(
-      [ 
-        "← classified in topics using title and abstract", 
-        "clustered using Leiden when inward and outward links →"
-      ], {
-        x: [1994, 2007], 
-        y: [0.03, 0.03],
-        fontSize: 10,
-      }),
-    Plot.ruleX([2000], {strokeOpacity: 0.6, strokeDasharray: 3}),
-  ]
-})
-```
-
-
-## Scaling up with more details
-
-<div class="warning">2009 is the last year we have data for now. We are still collecting data from openAlex. The problem is that to do the figure below, we need to to query all referenced papers of all papers in a year (we need to know the topic of each referenced paper, which requires an API call). In 2018, there are 6055 papers labeled as `Statistical Mechanics of Complex Networks`. If there on average 50 references by paper, it means we need to call openAlex API 6055*50=300K times (openAlex limit is 100K API calls/day). We are working on a workaround (to have openAlex snapshot on the VACC), but right now this is how we roll. It takes forever.</div>
-
-Recall that each topic is mapped onto a subfield, field, and domain. Here, we can also know map the relationships across scales: 
+Here, we can also know map the relationships across scales for stat mech of complex networks: 
 
 ```js
 Plot.plot({
